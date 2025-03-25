@@ -1,4 +1,30 @@
-# [CVPR 2025] DMD^3C
-Official Code of "[CVPR 2025] Distilling Monocular Foundation Model for Fine-grained Depth Completion"
+# DMD³C: Distilling Monocular Foundation Model for Fine-grained Depth Completion  
+**Official Code for the CVPR 2025 Paper**  
+**"[CVPR 2025] Distilling Monocular Foundation Model for Fine-grained Depth Completion"**  
 
-<img width="729" alt="418405495-4f46f90b-e39d-4d24-a163-ea2480bfab60" src="https://github.com/user-attachments/assets/da4a34ea-0390-418c-8111-22b2096110eb" />
+[📄 Paper on arXiv](https://arxiv.org/abs/2503.16970)
+
+---
+
+<div align="center">
+  <img width="729" alt="DMD3C Results" src="https://github.com/user-attachments/assets/da4a34ea-0390-418c-8111-22b2096110eb" />
+</div>
+
+---
+
+## 🔍 Overview
+
+DMD³C introduces a novel framework for **fine-grained depth completion** by distilling knowledge from **monocular foundation models**. This approach significantly enhances depth estimation accuracy in sparse data, especially in the regions without ground-truth.
+
+---
+
+<div align="center">
+  <img width="860" alt="DMD3C Results" src="https://github.com/user-attachments/assets/362ec3ec-3324-4d36-ab40-3c49d3623cc3" />
+</div>
+
+---
+
+## 🚀 Getting Started
+
+> Coming soon...
+
