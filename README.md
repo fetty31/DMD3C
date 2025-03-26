@@ -28,3 +28,7 @@ DMD³C introduces a novel framework for **fine-grained depth completion** by dis
 
 > Coming soon...
 
+## 📢 Code Availability Notice
+
+We’re currently in the middle of a **server migration**, and the code is temporarily **unavailable** 😢.  
+Once everything is settled, we’ll make the repo public **as soon as possible**. Thanks a lot for your patience and support! 🙏
