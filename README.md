@@ -14,7 +14,7 @@
 
 ## 🔍 Overview
 
-DMD³C introduces a novel framework for **fine-grained depth completion** by distilling knowledge from **monocular foundation models**. This approach significantly enhances depth estimation accuracy in sparse data, especially in the regions without ground-truth.
+DMD³C introduces a novel framework for **fine-grained depth completion** by distilling knowledge from **monocular foundation models**. This approach significantly enhances depth estimation accuracy in sparse data, especially in regions without ground-truth supervision.
 
 ---
 
@@ -24,11 +24,56 @@ DMD³C introduces a novel framework for **fine-grained depth completion** by dis
 
 ---
 
-## 🚀 Getting Started
+## 🆕 Update Log
 
-> Coming soon...
+- **[2025.04.11]** We have released the **inference code**! 🎉  
+  Stay tuned for training code and more updates.
 
-## 📢 Code Availability Notice
+---
 
-We’re currently in the middle of a **server migration**, and the code is temporarily **unavailable** 😢.  
-Once everything is settled, we’ll make the repo public **as soon as possible**. Thanks a lot for your patience and support! 🙏
+## 🚀 Getting Started (Inference Only)
+
+### 1. Clone Base Repository
+
+```bash
+git clone https://github.com/kakaxi314/BP-Net.git
+```
+
+### 2. Copy This Repo into the BP-Net Directory
+
+```bash
+cp -r DMD3C/ BP-Net/
+cd BP-Net/DMD3C/
+```
+
+### 3. Download Pretrained Checkpoints
+
+- 📥 [Google Drive – Checkpoints](#) *(Link coming soon)*
+
+### 4. Prepare KITTI Raw Data
+
+Download any sequence from the **KITTI Raw dataset**, which includes:
+
+- Camera intrinsics  
+- Velodyne point cloud  
+- Image sequences  
+
+Make sure the structure follows the **standard KITTI format**.
+
+### 5. Modify the Sequence in `demo.py`
+
+Open `demo.py` and go to **line 338**, where you can modify the input sequence path according to your downloaded KITTI data.
+
+```python
+# demo.py (Line 338)
+sequence = "/path/to/your/kitti/sequence"
+```
+
+### 6. Run Inference Demo
+
+```bash
+bash demo.sh
+```
+
+---
+
