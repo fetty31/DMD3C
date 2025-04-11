@@ -6,6 +6,14 @@
 
 ---
 
+## 🆕 Update Log
+
+- **[2025.04.11]** We have released the **inference code**! 🎉  
+> 🛠️ Our training code is still under construction and reproducibility verification.  
+> Thanks for your patience and support! 🙏
+
+---
+
 <div align="center">
   <img width="729" alt="DMD3C Results" src="https://github.com/user-attachments/assets/da4a34ea-0390-418c-8111-22b2096110eb" />
 </div>
@@ -22,12 +30,7 @@ DMD³C introduces a novel framework for **fine-grained depth completion** by dis
 
 ---
 
-## 🆕 Update Log
 
-- **[2025.04.11]** We have released the **inference code**! 🎉  
-  Stay tuned for training code and more updates.
-
----
 
 ## 🚀 Getting Started (Inference Only)
 
