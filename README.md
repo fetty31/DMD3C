@@ -17,10 +17,8 @@
 DMD³C introduces a novel framework for **fine-grained depth completion** by distilling knowledge from **monocular foundation models**. This approach significantly enhances depth estimation accuracy in sparse data, especially in regions without ground-truth supervision.
 
 ---
+![image](https://github.com/user-attachments/assets/f24eef8e-5dc2-483a-bb70-67671ff5e4e9)
 
-<div align="center">
-  <img width="860" alt="DMD3C Results" src="https://github.com/user-attachments/assets/362ec3ec-3324-4d36-ab40-3c49d3623cc3" />
-</div>
 
 ---
 
@@ -48,7 +46,7 @@ cd BP-Net/DMD3C/
 
 ### 3. Download Pretrained Checkpoints
 
-- 📥 [Google Drive – Checkpoints](#) *(Link coming soon)*
+- 📥 [Google Drive – Checkpoints](https://drive.google.com/file/d/131dxuAj7rmMRhk-VWemetpMiL4hONdz_/view?usp=drive_link) 
 
 ### 4. Prepare KITTI Raw Data
 
