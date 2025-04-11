@@ -40,7 +40,7 @@ git clone https://github.com/kakaxi314/BP-Net.git
 ### 2. Copy This Repo into the BP-Net Directory
 
 ```bash
-cp -r DMD3C/ BP-Net/
+cp DMD3C/* BP-Net/
 cd BP-Net/DMD3C/
 ```
 
