@@ -355,7 +355,6 @@ def main(cfg):
             
             if image is None:
                 break
-            width, height = image.shape[1], image.shape[0]
 
             # bin file -> numpy array
             velo_points = load_from_bin(os.path.join(
@@ -401,9 +400,6 @@ def main(cfg):
 
             # display result image
             fig, axs = plt.subplots(4, 1, figsize=(18, 12))  # 2行2列的子图
-            # import IPython
-            # IPython.embed()
-            # exit()
 
             # 第一个子图
             axs[0].imshow(image / 255)
@@ -425,23 +421,7 @@ def main(cfg):
             axs[3].set_title("Completed Depth Map")
             axs[3].axis('off')  # 隐藏坐标轴
             plt.tight_layout()
-            plt.savefig("combined_result.png")  # 保存合并的图像
-
-            # 将补全后的深度图转为点云
-            K_cam_np = K_cam.detach().cpu().numpy()
-            point_cloud = depth_to_point_cloud(output, K_cam_np)
-            pcd = save_point_cloud_to_ply_open3d(point_cloud, image, f'results3/pcd_bpnet/0000000{i:03d}_pcd.ply')
-            point_cloud_image = save_point_cloud_to_image(pcd)
-            
-            point_cloud_image = point_cloud_image
-            cv2.imwrite(f'results3/pcd_bpnet/0000000{i:03d}_pcd.png', point_cloud_image)
-            output_max, output_min = output.max(), output.min()
-
-            output_norm = (output - output_min) / (output_max - output_min) * 255
-            output_norm = output_norm.astype('uint8')
-            output_color = cv2.applyColorMap(output_norm, cv2.COLORMAP_JET)
-            cv2.imwrite(f'results3/pcd_bpnet/0000000{i:03d}_depth.png', output_color)
-
+            plt.savefig(f"outputs/0000000{i:03d}.png")  # 保存合并的图像
 
 if __name__ == '__main__':
     main()

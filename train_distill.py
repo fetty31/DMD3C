@@ -9,8 +9,6 @@ from tqdm import tqdm
 import hydra
 import torch.distributed as dist
 from utils import *
-from disp_loss import ScaleAndShiftInvariantLoss
-from torchvision.utils import save_image
 from rpnloss import RandomProposalNormalizationLoss
 
 def train(run):
