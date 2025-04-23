@@ -8,6 +8,7 @@
 
 ## 🆕 Update Log
 
+- **[2025.04.23]** We have released the **2rd stage training code**! 🎉  
 - **[2025.04.11]** We have released the **inference code**! 🎉  
 > 🛠️ Our training code is still under construction and reproducibility verification.  
 > Thanks for your patience and support! 🙏
@@ -49,7 +50,7 @@ cd BP-Net/DMD3C/
 
 ### 3. Download Pretrained Checkpoints
 
-- 📥 [Google Drive – Checkpoints](https://drive.google.com/file/d/131dxuAj7rmMRhk-VWemetpMiL4hONdz_/view?usp=drive_link) 
+- 📥 [Google Drive – Checkpoints] Comming soon... 
 
 ### 4. Prepare KITTI Raw Data
 
