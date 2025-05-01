@@ -92,9 +92,6 @@ def main(cfg):
             torch.cuda.synchronize()
             test(run)
             torch.cuda.synchronize()
-            run.save_state_epoch(epoch)
-            exit()
-
 
 if __name__ == '__main__':
     main()
