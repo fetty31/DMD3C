@@ -111,9 +111,9 @@ mv pretrained_mixed_singleview_256.pth checkpoints
 
 Zero-shot preformance on KITTI valiation set:
 
-| Training Data        | RMSE     | MAE      | iRMSE    |
-|----------------------|----------|----------|----------|
-| Single-view Images   | 1.4251 | 0.3722   | 0.0056 |
+| Training Data        | RMSE     | MAE      | iRMSE    | REL    |
+|----------------------|----------|----------|----------|----------|
+| Single-view Images   | 1.4251 | 0.3722   | 0.0056 | 0.0235 |
 
 
 Run metric-finetuning on KITTI dataset:
