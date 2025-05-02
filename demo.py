@@ -390,7 +390,7 @@ def main(cfg):
             image_tensor = torch.from_numpy(image_tensor)
             lidar_tensor = torch.from_numpy(lidar_tensor)
 
-            output = net(image_tensor.cuda(),
+            output = net(image_tensor.cuda(), None,
                          lidar_tensor.cuda(), K_cam[None].cuda())
             if isinstance(output, (list, tuple)):
                 output = output[-1]
