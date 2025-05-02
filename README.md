@@ -109,6 +109,13 @@ wget https://github.com/Sharpiless/DMD3C/releases/download/pretrain-checkpoints/
 mv pretrained_mixed_singleview_256.pth checkpoints
 ```
 
+Zero-shot preformance on KITTI valiation set:
+
+| Training Data        | RMSE     | MAE      | iRMSE    |
+|----------------------|----------|----------|----------|
+| Single-view Images   | 1.4251 | 0.3722   | 0.0056 |
+
+
 Run metric-finetuning on KITTI dataset:
 ```
 torchrun --nproc_per_node=4 --master_port 4321 train_distill.py \
