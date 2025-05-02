@@ -14,11 +14,6 @@
 ## ✅ To Do
 
 - [ ] 📦 Easy-to-use **data generation pipeline**
-- [ ] 🧠 **Checkpoints** trained on a **larger mixed dataset**
-- [ ] 🤖 Inference code for **SLAM applications**
-
-> ⚠️ **Note:** We're currently struggling with the response to a journal manuscript revision 📝😅.  
-> Thanks for your patience and continued support — we're doing our best to roll out updates as soon as we can! 🙏
 ---
 
 <div align="center">
