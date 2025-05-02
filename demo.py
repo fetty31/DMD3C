@@ -335,14 +335,14 @@ def main(cfg):
         net = run.net_ema.module.cuda()
         net.eval()
         # 读取左目图像
-        base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
+        base = "/datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
 
         image_type = 'color'  # 'grayscale' or 'color' image
 
         mode = '00' if image_type == 'grayscale' else '02'
 
-        v2c_filepath = './datas/kitti/raw/2011_09_26/calib_velo_to_cam.txt'
-        c2c_filepath = './datas/kitti/raw/2011_09_26/calib_cam_to_cam.txt'
+        v2c_filepath = '/datas/kitti/raw/2011_09_26/calib_velo_to_cam.txt'
+        c2c_filepath = '/datas/kitti/raw/2011_09_26/calib_cam_to_cam.txt'
         image_mean = np.array([90.9950, 96.2278, 94.3213])
         image_std = np.array([79.2382, 80.5267, 82.1483])
         image_height = 352
@@ -355,6 +355,7 @@ def main(cfg):
             
             if image is None:
                 break
+            width, height = image.shape[1], image.shape[0]
 
             # bin file -> numpy array
             velo_points = load_from_bin(os.path.join(
@@ -397,31 +398,17 @@ def main(cfg):
 
             output = output.squeeze().detach().cpu().numpy()
             image = image * image_std + image_mean
+            
+            output_max, output_min = output.max(), output.min()
+            output_norm = (output - output_min) / (output_max - output_min) * 255
+            output_norm = output_norm.astype('uint8')
+            output_color = cv2.applyColorMap(output_norm, cv2.COLORMAP_JET)
+            cv2.imwrite(f'outputs/0000000{i:03d}_depth.png', output_color)
+            
+            cv2.imwrite(f'outputs/0000000{i:03d}_image.png', image.astype(np.uint8)[:, :, ::-1])
+            cv2.imwrite(f'outputs/0000000{i:03d}_lidar.png', lidar.astype(np.uint8) * 3)
+            cv2.imwrite(f'outputs/0000000{i:03d}_image_vis.png', image_vis)
 
-            # display result image
-            fig, axs = plt.subplots(4, 1, figsize=(18, 12))  # 2行2列的子图
-
-            # 第一个子图
-            axs[0].imshow(image / 255)
-            axs[0].set_title("camera image")
-            axs[0].axis('off')  # 隐藏坐标轴
-
-            # 第一个子图
-            axs[1].imshow(image_vis)
-            axs[1].set_title("Lidar points to camera image")
-            axs[1].axis('off')  # 隐藏坐标轴
-
-            # 第二个子图
-            axs[2].imshow(lidar.astype(np.uint8) * 3, cmap="jet")
-            axs[2].set_title("Lidar points to depth map")
-            axs[2].axis('off')  # 隐藏坐标轴
-
-            # 第三个子图
-            axs[3].imshow(output, cmap='plasma')
-            axs[3].set_title("Completed Depth Map")
-            axs[3].axis('off')  # 隐藏坐标轴
-            plt.tight_layout()
-            plt.savefig(f"outputs/0000000{i:03d}.png")  # 保存合并的图像
 
 if __name__ == '__main__':
     main()
