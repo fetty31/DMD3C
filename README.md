@@ -49,11 +49,7 @@ cp DMD3C/* BP-Net/
 cd BP-Net/DMD3C/
 ```
 
-### 3. Download Pretrained Checkpoints
-
-- 📥 [Google Drive – Checkpoints] Comming soon... 
-
-### 4. Prepare KITTI Raw Data
+### 3. Prepare KITTI Raw Data
 
 Download any sequence from the **KITTI Raw dataset**, which includes:
 
@@ -63,7 +59,7 @@ Download any sequence from the **KITTI Raw dataset**, which includes:
 
 Make sure the structure follows the **standard KITTI format**.
 
-### 5. Modify the Sequence in `demo.py` for Inference
+### 4. Modify the Sequence in `demo.py` for Inference
 
 Open `demo.py` and go to **line 338**, where you can modify the input sequence path according to your downloaded KITTI data.
 
@@ -88,7 +84,7 @@ You will get results like this:
 
 ![supp-video 00_00_00-00_00_30](https://github.com/user-attachments/assets/a1412bca-c368-4d19-a081-79eeabaa2901)
 
-### 6. Train on KITTI
+### 5. Train on KITTI
 
 Runing monocular depth estimation for all KITTI-raw images. Data structure:
 ```
