@@ -39,7 +39,7 @@ DMD³C introduces a novel framework for **fine-grained depth completion** by dis
 
 
 
-## 🚀 Getting Started (Inference Only)
+## 🚀 Getting Started
 
 ### 1. Clone Base Repository
 
@@ -68,7 +68,7 @@ Download any sequence from the **KITTI Raw dataset**, which includes:
 
 Make sure the structure follows the **standard KITTI format**.
 
-### 5. Modify the Sequence in `demo.py`
+### 5. Modify the Sequence in `demo.py` for Inference
 
 Open `demo.py` and go to **line 338**, where you can modify the input sequence path according to your downloaded KITTI data.
 
@@ -87,3 +87,9 @@ You will get results like this:
 
 ![supp-video 00_00_00-00_00_30](https://github.com/user-attachments/assets/a1412bca-c368-4d19-a081-79eeabaa2901)
 
+### 7. Train on KITTI
+
+```
+wget https://github.com/Sharpiless/DMD3C/releases/download/pretrain-checkpoints/pretrained_mixed_singleview_256.pth
+mv pretrained_mixed_singleview_256.pth checkpoints
+```
