@@ -119,7 +119,7 @@ Zero-shot preformance on KITTI valiation set:
 Run metric-finetuning on KITTI dataset:
 ```
 torchrun --nproc_per_node=4 --master_port 4321 train_distill.py \
-    gpus=[0,1,2,3] num_workers=1 name=DMD3D_BP_MIXED_ \
+    gpus=[0,1,2,3] num_workers=4 name=DMD3D_BP_KITTI \
     ++chpt=checkpoints/pretrained_mixed_singleview_256.pth \
     net=PMP data=KITTI \
     lr=5e-4 train_batch_size=2 test_batch_size=1 \
