@@ -89,7 +89,33 @@ You will get results like this:
 
 ### 7. Train on KITTI
 
+Runing monocular depth estimation for all KITTI-raw images. Data structure:
+```
+├── datas/kitti/raw/
+│   ├── 2011_09_26
+│   │   ├── 2011_09_26_drive_0001_sync
+│   │   │   ├── image_02
+│   │   │   │   ├── data/*.png
+│   │   │   │   ├── disp/*.png
+│   │   │   ├── image_03
+│   │   ├── 2011_09_26_drive_0002_sync.......
+```
+
+Where disparity images are stored in gray-scale.
+
+Download pre-trained checkpoitns:
 ```
 wget https://github.com/Sharpiless/DMD3C/releases/download/pretrain-checkpoints/pretrained_mixed_singleview_256.pth
 mv pretrained_mixed_singleview_256.pth checkpoints
+```
+
+Run metric-finetuning on KITTI dataset:
+```
+torchrun --nproc_per_node=4 --master_port 4321 train_distill.py \
+    gpus=[0,1,2,3] num_workers=1 name=DMD3D_BP_MIXED_ \
+    ++chpt=checkpoints/pretrained_mixed_singleview_256.pth \
+    net=PMP data=KITTI \
+    lr=5e-4 train_batch_size=2 test_batch_size=1 \
+    sched/lr=NoiseOneCycleCosMo sched.lr.policy.max_momentum=0.90 \
+    nepoch=30 test_epoch=25 ++net.sbn=true 
 ```
