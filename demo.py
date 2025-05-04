@@ -335,7 +335,8 @@ def main(cfg):
         net = run.net_ema.module.cuda()
         net.eval()
         # 读取左目图像
-        base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
+        # base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
+        base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0048_sync"
 
         image_type = 'color'  # 'grayscale' or 'color' image
 
@@ -391,7 +392,7 @@ def main(cfg):
             image_tensor = torch.from_numpy(image_tensor)
             lidar_tensor = torch.from_numpy(lidar_tensor)
 
-            output = net(image_tensor.cuda(),
+            output = net(image_tensor.cuda(), None,
                          lidar_tensor.cuda(), K_cam[None].cuda())
             if isinstance(output, (list, tuple)):
                 output = output[-1]
