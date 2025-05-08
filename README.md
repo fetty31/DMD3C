@@ -71,8 +71,8 @@ sequence = "/path/to/your/kitti/sequence"
 Download pre-trained weights:
 
 ```
-wget https://github.com/Sharpiless/DMD3C/releases/download/pretrain-checkpoints/dmd3c_kitti.pth.pth
-mv dmd3c_kitti.pth.pth checkpoints
+wget https://github.com/Sharpiless/DMD3C/releases/download/pretrain-checkpoints/dmd3c_distillation_depth_anything_v2.pth
+mv dmd3c_distillation_depth_anything_v2.pth checkpoints
 ```
 
 Run inference:
