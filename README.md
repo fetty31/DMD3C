@@ -8,6 +8,7 @@
 
 ## 🆕 Update Log
 
+- **[2025.07.07]** Now **docker** scripts available!  
 - **[2025.04.23]** We have released the **2rd stage training code**! 🎉  
 - **[2025.04.11]** We have released the **inference code**! 🎉  
 
@@ -35,6 +36,32 @@ DMD³C introduces a novel framework for **fine-grained depth completion** by dis
 
 
 ## 🚀 Getting Started
+
+### (Docker only)
+__Clone repo and set up docker:__
+```sh
+git clone https://github.com/fetty31/DMD3C.git # clone repo
+cd DMD3C/docker/
+chmod +x build run
+./build # build docker image
+./run   # run docker container
+```
+__Once inside docker, set up environment:__
+```sh
+## 🐳 Inside the Docker container
+# build conda env
+cd home/DMD3C/
+conda env create -f environment.yml 
+conda init && source /root/.bashrc
+conda activate bp
+
+# build cuda extension
+cd exts
+export CC=/usr/bin/gcc
+export CXX=/usr/bin/g++
+python setup.py install 
+```
+__From this, jump to steps 3-5__
 
 ### 1. Clone Base Repository
 
@@ -78,6 +105,11 @@ mv dmd3c_distillation_depth_anything_v2.pth checkpoints
 Run inference:
 ```bash
 bash demo.sh
+```
+
+_(Or if you are using docker)_
+```bash
+bash demo_docker.sh
 ```
 
 You will get results like this:
