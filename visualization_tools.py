@@ -153,7 +153,17 @@ class PointCloudViewer:
         self.scene_widget.scene.add_geometry(self.geometry_name, pcd, rendering.MaterialRecord())
 
         bounds = pcd.get_axis_aligned_bounding_box()
-        self.scene_widget.setup_camera(60.0, bounds, bounds.get_center())
+        center = bounds.get_center()
+        extent = bounds.get_extent()
+        diameter = np.linalg.norm(extent)
+
+        lookat = pcd.get_center()
+        front = np.array([0.0, 0.0, 1.0])
+        up = np.array([0.0, 1.0, 0.0])
+        zoom_distance = 0.2 * np.linalg.norm(pcd.get_max_bound() - pcd.get_min_bound())
+
+        eye = lookat - front * zoom_distance
+        self.scene_widget.scene.camera.look_at(lookat, eye, up)
 
     def visualize_for_seconds(self, pointcloud_np, duration_sec=2, colors_np=None):
         self.update(pointcloud_np, colors_np)

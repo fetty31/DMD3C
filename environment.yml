@@ -272,3 +272,4 @@ dependencies:
   - pip:
       - open3d
       - imutils
+      - rosbags

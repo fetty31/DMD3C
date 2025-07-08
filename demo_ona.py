@@ -12,47 +12,10 @@ from PIL import Image
 import time
 from visualization_tools import ImageGridViewer, PointCloudImageViewer, PointCloudViewer
 
-def save_point_cloud_to_image(pcd, image_size=(1600, 1200)):
-    vis = o3d.visualization.Visualizer()
-    vis.create_window(visible=False, width=image_size[0], height=image_size[1])  # 设置窗口大小并不显示
+from rosbags.rosbag1 import Reader
+from rosbags.typesys import Stores, get_typestore
 
-    # 添加点云到可视化器中
-    vis.add_geometry(pcd)
-
-    # 获取 ViewControl 对象并设置自定义视角
-    view_control = vis.get_view_control()
-
-    # 设置视角参数
-    parameters = {
-			"boundingbox_max" : [ -1.5977719363706235, 11.519330868353832, 84.127326965332031 ],
-			"boundingbox_min" : [ -56.623178268627761, -50.724836932361825, 4.6948032379150391 ],
-			"field_of_view" : 60.0,
-			"front" : [ 0.36788389015943362, 0.28372788418091033, -0.8855280521244856 ],
-			"lookat" : [ -29.110475102499194, -19.602753032003996, 44.411065101623535 ],
-			"up" : [ -0.88654778269461509, -0.18027422226025128, -0.42606834403382188 ],
-			"zoom" : 0.5199999999999998
-		}
-
-    # 应用视角设置
-    ctr = vis.get_view_control()
-    ctr.set_lookat(parameters["lookat"])
-    ctr.set_front(parameters["front"])
-    ctr.set_up(parameters["up"])
-    ctr.set_zoom(parameters["zoom"])
-
-    # 渲染点云为图像
-    vis.poll_events()
-    vis.update_renderer()
-
-    # 获取点云的2D图像
-    depth_image = np.asarray(vis.capture_screen_float_buffer(do_render=True))
-    vis.destroy_window()
-
-    # 调整尺寸并格式化图像
-    depth_image = (depth_image * 255).astype(np.uint8)  # 转换为8位图像
-    depth_image = cv2.cvtColor(depth_image, cv2.COLOR_RGB2BGR)  # 转换为BGR格式以便与OpenCV兼容
-
-    return depth_image
+import struct # to decode pointcloud_2 data
 
 def depth_to_point_cloud(depth, K_cam):
     if isinstance(K_cam, np.ndarray):
@@ -128,13 +91,6 @@ def read_calib_file(filepath):
     return data
 
 
-def pull_K_cam(calib_path):
-    filedata = read_calib_file(calib_path)
-    P_rect_20 = np.reshape(filedata['P_rect_02'], (3, 4))
-    K_cam = P_rect_20[0:3, 0:3]
-    return K_cam
-
-
 def depth_color(val, min_d=0, max_d=120):
     """ 
     print Color(HSV's H value) corresponding to distance(m) 
@@ -172,11 +128,6 @@ def fov_setting(points, x, y, z, dist, h_fov, v_fov):
         return points[np.logical_and(h_points, v_points)]
 
 
-def in_range_points(points, size):
-    """ extract in-range points """
-    return np.logical_and(points > 0, points < size)
-
-
 def velo_points_filter(points, v_fov, h_fov):
     """ extract points corresponding to FOV setting """
 
@@ -210,108 +161,85 @@ def velo_points_filter(points, v_fov, h_fov):
     return xyz_, color
 
 
-def calib_velo2cam(filepath):
+def calib_velo2cam():
     """ 
     get Rotation(R : 3x3), Translation(T : 3x1) matrix info 
     using R,T matrix, we can convert velodyne coordinates to camera coordinates
     """
-    with open(filepath, "r") as f:
-        file = f.readlines()
 
-        for line in file:
-            (key, val) = line.split(':', 1)
-            if key == 'R':
-                R = np.fromstring(val, sep=' ')
-                R = R.reshape(3, 3)
-            if key == 'T':
-                T = np.fromstring(val, sep=' ')
-                T = T.reshape(3, 1)
+    R = np.array([-0.1533276, -0.98776117, 0.02860976, 
+                0.04630053, -0.0361014, -0.99827499, 
+                0.98709012, -0.15173846, 0.05126921]
+                )
+    R = R.reshape(3, 3)
+    T = np.array([0.28564802, 1.01355072, -0.9722258])
+    T = T.reshape(3, 1)
     return R, T
 
+def calib_cam2cam():
+    P_ = np.array([659.29813, 0.0, 760.64067,
+                0.0, 662.57773, 543.84931, 
+                0.0, 0.0, 1.0]
+                )
+    P_ = P_.reshape(3, 3)
+    d = np.array([-0.193406, 0.026607, 0.001749, -0.000172, 0.0])
 
-def calib_cam2cam(filepath, mode):
-    with open(filepath, "r") as f:
-        file = f.readlines()
-
-        for line in file:
-            (key, val) = line.split(':', 1)
-            if key == ('P_rect_' + mode):
-                P_ = np.fromstring(val, sep=' ')
-                P_ = P_.reshape(3, 4)
-                # erase 4th column ([0,0,0])
-                P_ = P_[:3, :3]
-    return P_
+    return P_, d
 
 
-def velo3d_2_camera2d_points(points, v_fov, h_fov, vc_path, cc_path, mode='02', image_shape=None):
+def velo3d_2_camera2d_points(points, v_fov, h_fov, K, D=None, image_shape=None):
     """ 
-    Return velodyne 3D points corresponding to camera 2D image and sparse depth map
+    Project 3D Velodyne points to 2D image points using camera calibration with distortion correction.
     """
 
-    # R_vc = Rotation matrix ( velodyne -> camera )
-    # T_vc = Translation matrix ( velodyne -> camera )
-    R_vc, T_vc = calib_velo2cam(vc_path)
+    # Get calibration: rotation & translation from Velodyne to Camera
+    R_vc, T_vc = calib_velo2cam()  # R: (3x3), T: (3x1)
 
-    # P_ = Projection matrix ( camera coordinates 3d points -> image plane 2d points )
-    P_ = calib_cam2cam(cc_path, mode)
-    xyz_v, c_ = velo_points_filter(points, v_fov, h_fov)
+    # Filter points based on FOV
+    xyz_v, c_ = velo_points_filter(points, v_fov, h_fov)  # xyz_v: 4xN (homogeneous)
 
-    RT_ = np.concatenate((R_vc, T_vc), axis=1)
-
-    # Initialize sparse depth map
     if image_shape is None:
-        raise ValueError(
-            "Image shape must be provided to generate sparse depth map")
+        raise ValueError("Image shape must be provided to generate sparse depth map")
 
-    # Create a depth map with NaN values
-    depth_map = np.full(image_shape[:2], 0)
+    # Convert xyz_v (homogeneous) to 3xN
+    xyz_v = xyz_v[:3, :]
 
-    # Convert velodyne coordinates(X_v, Y_v, Z_v) to camera coordinates(X_c, Y_c, Z_c)
-    for i in range(xyz_v.shape[1]):
-        xyz_v[:3, i] = np.matmul(RT_, xyz_v[:, i])
+    # Transform points to camera coordinates: X_c = R * X_v + T
+    xyz_c = R_vc @ xyz_v + T_vc
 
-    xyz_c = np.delete(xyz_v, 3, axis=0)
+    # Transpose to Nx3 for OpenCV
+    xyz_c = xyz_c.T.reshape(-1, 1, 3)
 
-    # Convert camera coordinates(X_c, Y_c, Z_c) to image(pixel) coordinates(x,y)
-    for i in range(xyz_c.shape[1]):
-        xyz_c[:, i] = np.matmul(P_, xyz_c[:, i])
+    # Project to 2D with distortion
+    if D is not None:
+        img_points, _ = cv2.projectPoints(xyz_c, np.zeros((3,1)), np.zeros((3,1)), K, D)
+    else:
+        img_points, _ = cv2.projectPoints(xyz_c, np.zeros((3,1)), np.zeros((3,1)), K, np.array([0,0,0,0,0]))
+    img_points = img_points.reshape(-1, 2)
 
-    # Normalize by the third coordinate to get 2D pixel coordinates
-    xy_i = xyz_c[:2, :] / xyz_c[2, :]
-    depth_values = xyz_c[2, :]  # Z-coordinate (depth) in camera space
+    # Extract depth (Z in camera frame)
+    depth_values = xyz_c[:, 0, 2]
 
-    # Filter out points that are out of image bounds
+    # Create empty depth map
+    depth_map = np.full(image_shape[:2], 0, dtype=np.float32)
+
+    # Filter valid points within image bounds
     valid_mask = np.logical_and.reduce((
-        xy_i[0, :] >= 0,
-        xy_i[0, :] < image_shape[1],  # x coordinate within image width
-        xy_i[1, :] >= 0,
-        xy_i[1, :] < image_shape[0],  # y coordinate within image height
+        img_points[:, 0] >= 0,
+        img_points[:, 0] < image_shape[1],
+        img_points[:, 1] >= 0,
+        img_points[:, 1] < image_shape[0],
     ))
 
-    valid_points = xy_i[:, valid_mask]
+    valid_img_points = img_points[valid_mask]
     valid_depths = depth_values[valid_mask]
 
-    # Fill the depth map with depth values
-    for i in range(valid_points.shape[1]):
-        x = int(valid_points[0, i])
-        y = int(valid_points[1, i])
-        depth_map[y, x] = valid_depths[i]
+    # Populate depth map
+    for pt, depth in zip(valid_img_points, valid_depths):
+        x, y = int(pt[0]), int(pt[1])
+        depth_map[y, x] = depth
 
-    # Return both the projected points and the sparse depth map
-    return valid_points, c_, depth_map
-
-
-def print_projection_cv2(points, color, image):
-    """ project converted velodyne points into camera image """
-
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-    for i in range(points.shape[1]):
-        cv2.circle(hsv_image, (np.int32(points[0][i]), np.int32(
-            points[1][i])), 2, (int(color[i]), 255, 255), -1)
-
-    return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-
+    return valid_img_points.T, c_, depth_map
 
 def print_projection_plt(points, color, image):
     """ project converted velodyne points into camera image """
@@ -330,46 +258,83 @@ def load_from_bin(bin_path):
     # ignore reflectivity info
     return obj[:, :3]
 
+def pointcloud2_to_xyz_array(cloud_msg):
+    """
+    Convert sensor_msgs/PointCloud2 to an Nx3 NumPy array.
+    Assumes XYZ floats.
+    """
+    fmt = 'fff'  # just XYZ (each float32)
+    width = cloud_msg.width
+    height = cloud_msg.height
+    point_step = cloud_msg.point_step
+    row_step = cloud_msg.row_step
+    data = cloud_msg.data
 
-def set_axes_equal(ax):
-    """使 3D 图的刻度长短一致"""
-    x_limits = ax.get_xlim3d()
-    y_limits = ax.get_ylim3d()
-    z_limits = ax.get_zlim3d()
+    points = []
+    for i in range(0, len(data), point_step):
+        x, y, z = struct.unpack_from(fmt, data, offset=i)
+        points.append((x, y, z))
 
-    # 找到所有坐标的中心和范围
-    x_range = abs(x_limits[1] - x_limits[0])
-    x_middle = np.mean(x_limits)
-    y_range = abs(y_limits[1] - y_limits[0])
-    y_middle = np.mean(y_limits)
-    z_range = abs(z_limits[1] - z_limits[0])
-    z_middle = np.mean(z_limits)
+    return np.array(points, dtype=np.float32)
 
-    # 计算出最大的范围
-    plot_radius = 0.5 * max([x_range, y_range, z_range])
+def load_image_from_rosbag(bag_path, N=-1):
+    typestore = get_typestore(Stores.ROS1_NOETIC)
+    topic = "/ona2/sensors/flir_camera_front/image_raw"
+    images = []
 
-    # 设置每个坐标轴的范围，使其相等
-    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
-    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
-    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+    with Reader(bag_path) as reader:
+        connections = [x for x in reader.connections if x.topic == topic]
+        c = 0
+
+        for connection, timestamp, rawdata in reader.messages(connections=connections):
+
+            msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+
+            if msg.encoding != "bayer_rggb8":
+                print(f"Unsupported encoding: {msg.encoding}")
+                continue
+
+            height = msg.height
+            width = msg.width
+            data = np.frombuffer(msg.data, dtype=np.uint8).reshape((height, width))
+
+            # Debayer using OpenCV: Bayer RGGB -> RGB
+            rgb_img = cv2.cvtColor(data, cv2.COLOR_BAYER_RG2RGB)
+            images.append(rgb_img)
+
+            c += 1
+            if c > N and N > 0:
+                break
+
+    if len(images) > 0:
+        print(f"Loaded images shape: {images[0].shape}, dtype: {images[0].dtype}")
+    return images
 
 
-def save_point_cloud_to_ply_open3d(point_cloud, image, filename):
-    # 创建 open3d 点云对象
-    pcd = o3d.geometry.PointCloud()
+def load_pcd_from_rosbag(bag_path, N=-1):
+    # Create a typestore for the matching ROS release.
+    typestore = get_typestore(Stores.ROS1_NOETIC)
 
-    # 设置点云的坐标
-    pcd.points = o3d.utility.Vector3dVector(point_cloud)
+    # Topic to filter
+    topic = "/ona2/sensors/pandar_front/cloud"
+    pcds = []
 
-    # 将图像展开为 (N, 3) 形式的颜色数据
-    colors = image.reshape(-1, 3) / 255.0  # 归一化颜色到 [0, 1]
+    c = 0
+    # Create reader instance and open for reading.
+    with Reader(bag_path) as reader:
+        connections = [x for x in reader.connections if x.topic == topic]
 
-    # 设置点云的颜色
-    pcd.colors = o3d.utility.Vector3dVector(colors)
+        for connection, timestamp, rawdata in reader.messages(connections=connections):
 
-    # 保存点云为 .ply 文件
-    o3d.io.write_point_cloud(filename, pcd)
-    return pcd
+            msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+            np_points = pointcloud2_to_xyz_array(msg)
+            pcds.append(np_points) 
+            c += 1
+            if c > N and N > 0:
+                break
+    
+    return pcds
+
 
 def visualize_pointcloud(points: np.ndarray, colors: np.ndarray = None):
     """
@@ -414,14 +379,10 @@ def main(cfg):
     with Trainer(cfg) as run:
         net = run.net_ema.module.cuda()
         net.eval()
-        # 读取左目图像
-        global_path = "/home/kitti_dataset/"
-        # base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
-        base = global_path + "2011_09_26/2011_09_26_drive_0005_sync"
 
-        image_type = 'color'  # 'grayscale' or 'color' image
-
-        mode = '00' if image_type == 'grayscale' else '02'
+        global_path = "/home/kitti_dataset/2024_11_07_born/"
+        image_bag_name = "2024-11-07-11-24-29_3.bag"
+        pcd_bag_name = "2024-11-07-11-24-14_1.bag"
 
         v2c_filepath = global_path + '2011_09_26/calib_velo_to_cam.txt'
         c2c_filepath = global_path + '2011_09_26/calib_cam_to_cam.txt'
@@ -430,48 +391,72 @@ def main(cfg):
         image_height = 352
         image_width = 1216
 
-        t_file = base + "/image_" + mode + "/timestamps.txt"
-        with open(t_file, 'r') as f:
-            N = sum(1 for _ in f)
+        # Get LiDAR data from rosbag
+        pcd_array = load_pcd_from_rosbag(global_path + "robot/" + pcd_bag_name, 150)
+
+        # Get image data from rosbag
+        images_array = load_image_from_rosbag(global_path + "camera/" + image_bag_name, 150)
+
+        print(f"Loaded {len(images_array)} images and {len(pcd_array)} pcds.")
 
         # viewer = ImageGridViewer(titles=["Depth", "Raw", "Lidar", "Projected"])
         # viewer_3d = PointCloudImageViewer()
         # viewer_pc = PointCloudViewer()
 
-        for i in tqdm(range(N)):
-            
-            image = np.array(Image.open(os.path.join(
-                base, 'image_' + mode + f'/data/0000000{i:03d}.png')).convert('RGB'), dtype=np.uint8)
-            
-            if image is None:
-                break
-            width, height = image.shape[1], image.shape[0]
+        N = len(images_array)
+        i_pcd = 0
+        for i in tqdm(range(0,N,2)): # We take 1 pcd for each 2 images (LiDAR: 10Hz, Camera: 20Hz)
 
-            # bin file -> numpy array
-            velo_points = load_from_bin(os.path.join(
-                base, f'velodyne_points/data/0000000{i:03d}.bin'))
+            image = images_array[i]
+            w, h = image.shape[1], image.shape[0]
 
-            image_type = 'color'  # 'grayscale' or 'color' image
-            # image_00 = 'grayscale image' , image_02 = 'color image'
-            mode = '00' if image_type == 'grayscale' else '02'
+            # Undistort image
+            K, D = calib_cam2cam()
 
-            ans, c_, lidar = velo3d_2_camera2d_points(velo_points, v_fov=(-24.9, 2.0), h_fov=(-45, 45),
-                                                      vc_path=v2c_filepath, cc_path=c2c_filepath, mode=mode,
-                                                      image_shape=image.shape)
+                # Get optimal new camera matrix
+            # new_K, roi = cv2.getOptimalNewCameraMatrix(K, D, (w, h), 1, (w, h))
+
+            #     # Undistort using new_K
+            # undistorted_img = cv2.undistort(image, K, D, None, new_K)
+            # x, y, w, h = roi
+            # cropped_img = undistorted_img[y:y+h, x:x+w]
+
+            # Resize image to model dimensions
+            resized = cv2.resize(image, (image_width, image_height), interpolation=cv2.INTER_AREA)
+            image = resized
+
+            # Correct intrinsics
+            CALIB_W = 1440
+            CALIB_H = 1080
+
+            sx = image_width / CALIB_W
+            sy = image_height / CALIB_H
+
+            # new_K[0,0] *= sx 
+            # new_K[1,1] *= sy 
+            # new_K[0,2] *= sx 
+            # new_K[1,2] *= sy 
+
+            K[0,0] *= sx 
+            K[1,1] *= sy 
+            K[0,2] *= sx 
+            K[1,2] *= sy 
+
+            # Get pointcloud
+            pcd = pcd_array[i_pcd]
+            i_pcd += 1
+
+            # Project 3D points into 2D (in pixels)
+            ans, c_, lidar = velo3d_2_camera2d_points(pcd, v_fov=(-24.9, 2.0), h_fov=(-45, 45),
+                                                      K=K, D=D, image_shape=image.shape)
 
             image_vis = print_projection_plt(points=ans, color=c_, image=image.copy())
 
-            # depth completion
-            K_cam = torch.from_numpy(pull_K_cam(
-                c2c_filepath).astype(np.float32)).cuda()
+            # Depth completion
+            # K_cam = torch.from_numpy(new_K.astype(np.float32)).cuda()
+            K_cam = torch.from_numpy(K.astype(np.float32)).cuda()
             
-            tp = image.shape[0] - image_height
-            lp = (image.shape[1] - image_width) // 2
-            image = image[tp:tp + image_height, lp:lp + image_width]
-            lidar = lidar[tp:tp + image_height, lp:lp + image_width, None]
-            image_vis = image_vis[tp:tp + image_height, lp:lp + image_width]
-            K_cam[0, 2] -= lp
-            K_cam[1, 2] -= tp
+            lidar = lidar[:, :, None]
 
             image = (image - image_mean) / image_std
 
@@ -481,8 +466,13 @@ def main(cfg):
             image_tensor = torch.from_numpy(image_tensor)
             lidar_tensor = torch.from_numpy(lidar_tensor)
 
+            m_start = time.time()
+
             output = net(image_tensor.cuda(), None,
                          lidar_tensor.cuda(), K_cam[None].cuda())
+
+            m_end = time.time()
+            print(f"Inference time: {(m_end - m_start)*1000.0} ms")
 
             if isinstance(output, (list, tuple)):
                 output = output[-1]
@@ -506,17 +496,17 @@ def main(cfg):
 
             # viewer_3d.visualize_for_seconds(points_3d, output_color, 2)
 
-            # viewer_pc.visualize_for_seconds(points_3d, 2, colors)
+            # viewer_pc.visualize_for_seconds(points_3d, 5, colors)
 
             # viewer.update([output_color, image.astype(np.uint8)[:, :, ::-1], lidar.astype(np.uint8) * 3, image_vis],
-            #                duration=0.5)  # Display for x seconds
+            #                duration=0.1)  # Display for x seconds
 
-            cv2.imwrite(f'outputs/0000000{i:03d}_depth.png', output_color)
+            # (Optional) Save outputs
+            # cv2.imwrite(f'outputs/0000000{i:03d}_depth.png', output_color)
             
-            cv2.imwrite(f'outputs/0000000{i:03d}_image.png', image.astype(np.uint8)[:, :, ::-1])
-            cv2.imwrite(f'outputs/0000000{i:03d}_lidar.png', lidar.astype(np.uint8) * 3)
-            cv2.imwrite(f'outputs/0000000{i:03d}_image_vis.png', image_vis)
-
+            # cv2.imwrite(f'outputs/0000000{i:03d}_image.png', image.astype(np.uint8)[:, :, ::-1])
+            # cv2.imwrite(f'outputs/0000000{i:03d}_lidar.png', lidar.astype(np.uint8) * 3)
+            # cv2.imwrite(f'outputs/0000000{i:03d}_image_vis.png', image_vis)
 
 if __name__ == '__main__':
     main()
