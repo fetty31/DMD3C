@@ -155,8 +155,10 @@ def velo_points_filter(points, v_fov, h_fov):
     xyz_ = np.concatenate((xyz_, one_mat), axis=0)
 
     # need dist info for points color
-    dist_lim = fov_setting(dist, x, y, z, dist, h_fov, v_fov)
-    color = depth_color(dist_lim, 0, 70)
+    # dist_lim = fov_setting(dist, x, y, z, dist, h_fov, v_fov)
+    p3N = xyz_[:3, :]
+    norms = np.linalg.norm(p3N, axis=0)
+    color = depth_color(norms, 0, np.max(norms))
 
     return xyz_, color
 
@@ -214,7 +216,7 @@ def velo3d_2_camera2d_points(points, v_fov, h_fov, K, D=None, image_shape=None):
     if D is not None:
         img_points, _ = cv2.projectPoints(xyz_c, np.zeros((3,1)), np.zeros((3,1)), K, D)
     else:
-        img_points, _ = cv2.projectPoints(xyz_c, np.zeros((3,1)), np.zeros((3,1)), K, np.array([0,0,0,0,0]))
+        img_points, _ = cv2.projectPoints(xyz_c, np.zeros((3,1)), np.zeros((3,1)), K, None)
     img_points = img_points.reshape(-1, 2)
 
     # Extract depth (Z in camera frame)
@@ -277,38 +279,56 @@ def pointcloud2_to_xyz_array(cloud_msg):
 
     return np.array(points, dtype=np.float32)
 
-def load_image_from_rosbag(bag_path, N=-1):
+def load_image_from_rosbag(bag_path, stamps, N=-1):
     typestore = get_typestore(Stores.ROS1_NOETIC)
     topic = "/ona2/sensors/flir_camera_front/image_raw"
     images = []
+    pcd_ids = []
 
     with Reader(bag_path) as reader:
         connections = [x for x in reader.connections if x.topic == topic]
-        c = 0
+        c = 0   
+        stamp_i = 0
+        start_found = False
 
         for connection, timestamp, rawdata in reader.messages(connections=connections):
+            
+            now = timestamp*1e-9
 
-            msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
-
-            if msg.encoding != "bayer_rggb8":
-                print(f"Unsupported encoding: {msg.encoding}")
+            if now > stamps[min(stamp_i,len(stamps)-1)] and not start_found:
+                stamp_i += 1
                 continue
+            else:
+                start_found = True
 
-            height = msg.height
-            width = msg.width
-            data = np.frombuffer(msg.data, dtype=np.uint8).reshape((height, width))
+            print(f"now: {now}")
+            print(f"stamp: {stamps[stamp_i]}")
 
-            # Debayer using OpenCV: Bayer RGGB -> RGB
-            rgb_img = cv2.cvtColor(data, cv2.COLOR_BAYER_RG2RGB)
-            images.append(rgb_img)
+            if now >= stamps[stamp_i] and now < stamps[min(stamp_i+1,len(stamps)-1)]:
 
-            c += 1
-            if c > N and N > 0:
-                break
+                msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+
+                if msg.encoding != "bayer_rggb8":
+                    print(f"Unsupported encoding: {msg.encoding}")
+                    continue
+
+                height = msg.height
+                width = msg.width
+                data = np.frombuffer(msg.data, dtype=np.uint8).reshape((height, width))
+
+                # Debayer using OpenCV: Bayer RGGB -> RGB
+                rgb_img = cv2.cvtColor(data, cv2.COLOR_BAYER_RG2RGB)
+                images.append(rgb_img)
+                pcd_ids.append(stamp_i)
+                stamp_i += 1
+
+                c += 1
+                if c > N and N > 0:
+                    break
 
     if len(images) > 0:
         print(f"Loaded images shape: {images[0].shape}, dtype: {images[0].dtype}")
-    return images
+    return images, pcd_ids
 
 
 def load_pcd_from_rosbag(bag_path, N=-1):
@@ -318,6 +338,7 @@ def load_pcd_from_rosbag(bag_path, N=-1):
     # Topic to filter
     topic = "/ona2/sensors/pandar_front/cloud"
     pcds = []
+    stamps = []
 
     c = 0
     # Create reader instance and open for reading.
@@ -329,11 +350,12 @@ def load_pcd_from_rosbag(bag_path, N=-1):
             msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
             np_points = pointcloud2_to_xyz_array(msg)
             pcds.append(np_points) 
+            stamps.append(timestamp*1e-9)
             c += 1
             if c > N and N > 0:
                 break
     
-    return pcds
+    return pcds, stamps
 
 
 def visualize_pointcloud(points: np.ndarray, colors: np.ndarray = None):
@@ -384,28 +406,25 @@ def main(cfg):
         image_bag_name = "2024-11-07-11-24-29_3.bag"
         pcd_bag_name = "2024-11-07-11-24-14_1.bag"
 
-        v2c_filepath = global_path + '2011_09_26/calib_velo_to_cam.txt'
-        c2c_filepath = global_path + '2011_09_26/calib_cam_to_cam.txt'
         image_mean = np.array([90.9950, 96.2278, 94.3213])
         image_std = np.array([79.2382, 80.5267, 82.1483])
         image_height = 352
         image_width = 1216
 
         # Get LiDAR data from rosbag
-        pcd_array = load_pcd_from_rosbag(global_path + "robot/" + pcd_bag_name, 150)
+        pcd_array, stamps = load_pcd_from_rosbag(global_path + "robot/" + pcd_bag_name)
 
         # Get image data from rosbag
-        images_array = load_image_from_rosbag(global_path + "camera/" + image_bag_name, 150)
+        images_array, pcd_ids = load_image_from_rosbag(global_path + "camera/" + image_bag_name, stamps)
 
         print(f"Loaded {len(images_array)} images and {len(pcd_array)} pcds.")
 
-        # viewer = ImageGridViewer(titles=["Depth", "Raw", "Lidar", "Projected"])
+        viewer = ImageGridViewer(titles=["Depth", "Raw", "Lidar", "Projected"])
         # viewer_3d = PointCloudImageViewer()
         # viewer_pc = PointCloudViewer()
 
         N = len(images_array)
-        i_pcd = 0
-        for i in tqdm(range(0,N,2)): # We take 1 pcd for each 2 images (LiDAR: 10Hz, Camera: 20Hz)
+        for i in tqdm(range(N)): 
 
             image = images_array[i]
             w, h = image.shape[1], image.shape[0]
@@ -413,16 +432,26 @@ def main(cfg):
             # Undistort image
             K, D = calib_cam2cam()
 
-                # Get optimal new camera matrix
-            # new_K, roi = cv2.getOptimalNewCameraMatrix(K, D, (w, h), 1, (w, h))
+            # h, w = img.shape[:2]
+            # new_K, _ = cv2.getOptimalNewCameraMatrix(K, D, (w, h), 1, (w, h))
 
-            #     # Undistort using new_K
-            # undistorted_img = cv2.undistort(image, K, D, None, new_K)
-            # x, y, w, h = roi
-            # cropped_img = undistorted_img[y:y+h, x:x+w]
+            # # Compute undistort maps
+            # map1, map2 = cv2.initUndistortRectifyMap(K, D, None, new_K, (w, h), cv2.CV_16SC2)
+
+            # # Apply remap
+            # undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR)
+
+                # Get optimal new camera matrix
+            new_K, roi = cv2.getOptimalNewCameraMatrix(K, D, (w, h), 1, (w, h))
+
+                # Undistort using new_K
+            undistorted_img = cv2.undistort(image, K, D, None, new_K)
+            x, y, w, h = roi
+            cropped_img = undistorted_img[y:y+h, x:x+w]
 
             # Resize image to model dimensions
-            resized = cv2.resize(image, (image_width, image_height), interpolation=cv2.INTER_AREA)
+            # resized = cv2.resize(image, (image_width, image_height), interpolation=cv2.INTER_AREA)
+            resized = cv2.resize(undistorted_img, (image_width, image_height), interpolation=cv2.INTER_AREA)
             image = resized
 
             # Correct intrinsics
@@ -432,29 +461,30 @@ def main(cfg):
             sx = image_width / CALIB_W
             sy = image_height / CALIB_H
 
-            # new_K[0,0] *= sx 
-            # new_K[1,1] *= sy 
-            # new_K[0,2] *= sx 
-            # new_K[1,2] *= sy 
+            new_K[0,0] *= sx 
+            new_K[1,1] *= sy 
+            new_K[0,2] *= sx 
+            new_K[1,2] *= sy 
 
-            K[0,0] *= sx 
-            K[1,1] *= sy 
-            K[0,2] *= sx 
-            K[1,2] *= sy 
+            # K[0,0] *= sx 
+            # K[1,1] *= sy 
+            # K[0,2] *= sx 
+            # K[1,2] *= sy 
 
             # Get pointcloud
-            pcd = pcd_array[i_pcd]
-            i_pcd += 1
+            pcd = pcd_array[pcd_ids[i]]
 
             # Project 3D points into 2D (in pixels)
+            # ans, c_, lidar = velo3d_2_camera2d_points(pcd, v_fov=(-24.9, 2.0), h_fov=(-45, 45),
+            #                                           K=K, D=D, image_shape=image.shape)
             ans, c_, lidar = velo3d_2_camera2d_points(pcd, v_fov=(-24.9, 2.0), h_fov=(-45, 45),
-                                                      K=K, D=D, image_shape=image.shape)
+                                                      K=new_K, D=None, image_shape=image.shape)
 
             image_vis = print_projection_plt(points=ans, color=c_, image=image.copy())
 
             # Depth completion
-            # K_cam = torch.from_numpy(new_K.astype(np.float32)).cuda()
-            K_cam = torch.from_numpy(K.astype(np.float32)).cuda()
+            K_cam = torch.from_numpy(new_K.astype(np.float32)).cuda()
+            # K_cam = torch.from_numpy(K.astype(np.float32)).cuda()
             
             lidar = lidar[:, :, None]
 
@@ -498,8 +528,10 @@ def main(cfg):
 
             # viewer_pc.visualize_for_seconds(points_3d, 5, colors)
 
-            # viewer.update([output_color, image.astype(np.uint8)[:, :, ::-1], lidar.astype(np.uint8) * 3, image_vis],
-            #                duration=0.1)  # Display for x seconds
+            lidar = depth_color(lidar, 0, 35)
+            lidar = cv2.applyColorMap(lidar.astype(np.uint8)*3, cv2.COLORMAP_TURBO)
+            viewer.update([output_color, image.astype(np.uint8)[:, :, ::-1], lidar, image_vis],
+                           duration=0.1)  # Display for x seconds
 
             # (Optional) Save outputs
             # cv2.imwrite(f'outputs/0000000{i:03d}_depth.png', output_color)
