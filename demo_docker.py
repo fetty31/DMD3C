@@ -67,7 +67,7 @@ def depth_to_point_cloud(depth, K_cam):
     z = depth[0][0]
     x = (j - K_cam[0, 2]) * z / K_cam[0, 0]
     y = (i - K_cam[1, 2]) * z / K_cam[1, 1]
-    y = -y
+    # y = -y
 
     points = torch.stack((x, y, z), dim=2).reshape(-1, 3)
     return points.detach().cpu().numpy()
@@ -101,6 +101,7 @@ def depth_to_colored_point_cloud(depth, K_cam, bgr_image):
     x = (j - K_cam[0, 2]) * z / K_cam[0, 0]
     y = (i - K_cam[1, 2]) * z / K_cam[1, 1]
     y = -y  # flip if needed
+    x = -x  # flip if needed
 
     points = torch.stack((x, y, z), dim=2).reshape(-1, 3).detach().cpu().numpy()
 
@@ -416,7 +417,6 @@ def main(cfg):
         net.eval()
         # 读取左目图像
         global_path = "/home/kitti_dataset/"
-        # base = "datas/kitti/raw/2011_09_26/2011_09_26_drive_0002_sync"
         base = global_path + "2011_09_26/2011_09_26_drive_0005_sync"
 
         image_type = 'color'  # 'grayscale' or 'color' image
@@ -434,7 +434,7 @@ def main(cfg):
         with open(t_file, 'r') as f:
             N = sum(1 for _ in f)
 
-        # viewer = ImageGridViewer(titles=["Depth", "Raw", "Lidar", "Projected"])
+        viewer = ImageGridViewer(titles=["Depth", "Raw", "Lidar", "Projected"])
         # viewer_3d = PointCloudImageViewer()
         # viewer_pc = PointCloudViewer()
 
@@ -508,8 +508,8 @@ def main(cfg):
 
             # viewer_pc.visualize_for_seconds(points_3d, 2, colors)
 
-            # viewer.update([output_color, image.astype(np.uint8)[:, :, ::-1], lidar.astype(np.uint8) * 3, image_vis],
-            #                duration=0.5)  # Display for x seconds
+            viewer.update([output_color, image.astype(np.uint8)[:, :, ::-1], lidar.astype(np.uint8) * 3, image_vis],
+                           duration=0.5)  # Display for x seconds
 
             cv2.imwrite(f'outputs/0000000{i:03d}_depth.png', output_color)
             

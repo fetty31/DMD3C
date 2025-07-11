@@ -1,6 +1,8 @@
 # Base image with CUDA and PyTorch support
 FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 # System setup
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip python3-dev git build-essential cmake \

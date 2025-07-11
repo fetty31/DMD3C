@@ -46,6 +46,13 @@ chmod +x build run
 ./build # build docker image
 ./run   # run docker container
 ```
+
+_Note that inside the `run` script the directory on your PC with the KITTI data is shared with the docker container via:_
+```sh
+--volume="$HOME/Desktop/kitti_dataset:/home/kitti_dataset" 
+```
+_Change this line (80) inside the [run](docker/run) script in order to match with your KITTI dataset parent folder._
+
 __Once inside docker, set up environment:__
 ```sh
 ## 🐳 Inside the Docker container
@@ -92,7 +99,14 @@ Open `demo.py` and go to **line 338**, where you can modify the input sequence p
 
 ```python
 # demo.py (Line 338)
-sequence = "/path/to/your/kitti/sequence"
+base = "/your/path/to/kitti/sequence"
+```
+
+_(Or if you are using docker):_
+```python
+# demo_docker.py (Line 418)
+global_path = "/your/path/to/kitti/"
+base = global_path + "/sequence"
 ```
 
 Download pre-trained weights:

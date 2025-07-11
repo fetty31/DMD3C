@@ -64,6 +64,7 @@ def depth_to_colored_point_cloud(depth, K_cam, bgr_image):
     x = (j - K_cam[0, 2]) * z / K_cam[0, 0]
     y = (i - K_cam[1, 2]) * z / K_cam[1, 1]
     y = -y  # flip if needed
+    x = -x  # flip if needed
 
     points = torch.stack((x, y, z), dim=2).reshape(-1, 3).detach().cpu().numpy()
 
@@ -279,9 +280,22 @@ def pointcloud2_to_xyz_array(cloud_msg):
 
     return np.array(points, dtype=np.float32)
 
-def load_image_from_rosbag(bag_path, stamps, N=-1):
+def load_image_from_rosbag(bag_path, topic, stamps, N=-1):
+    """
+    Loads each rgb image from a rosbag file taking also into account a simple synchronization
+    strategy w.r.t to the pcd timestamps.
+
+    Args:
+        bag_path (str): path to the rosbag file.
+        topic (str): the topic with image data (sensor_msgs/ImageRaw) 
+        stamps (list(float)): time stamp of each pointcloud/LiDAR frame.
+        N (int): optional max number of images retrieved
+
+    Returns:
+        images (list(np.ndarray)): list of BGR images.
+        pcd_ids (list(int)): index of the closest (in time) pointclouds for the chosen images.
+    """
     typestore = get_typestore(Stores.ROS1_NOETIC)
-    topic = "/ona2/sensors/flir_camera_front/image_raw"
     images = []
     pcd_ids = []
 
@@ -331,12 +345,23 @@ def load_image_from_rosbag(bag_path, stamps, N=-1):
     return images, pcd_ids
 
 
-def load_pcd_from_rosbag(bag_path, N=-1):
+def load_pcd_from_rosbag(bag_path, topic, N=-1):
+    """
+    Loads each pcd from a rosbag file.
+
+    Args:
+        bag_path (str): path to the rosbag file.
+        topic (str): the topic with pointcloud data (sensor_msgs/PointCloud2) 
+        N (int): optional max number of pcd retrieved
+
+    Returns:
+        pcds (list(np.ndarray)): list of pointclouds (pcd).
+        stamps (list(float)): time stamp of each pointcloud/LiDAR frame.
+    """
     # Create a typestore for the matching ROS release.
     typestore = get_typestore(Stores.ROS1_NOETIC)
 
     # Topic to filter
-    topic = "/ona2/sensors/pandar_front/cloud"
     pcds = []
     stamps = []
 
@@ -406,16 +431,19 @@ def main(cfg):
         image_bag_name = "2024-11-07-11-24-29_3.bag"
         pcd_bag_name = "2024-11-07-11-24-14_1.bag"
 
+        topic_lidar = "/ona2/sensors/pandar_front/cloud"
+        topic_camera = "/ona2/sensors/flir_camera_front/image_raw"
+
         image_mean = np.array([90.9950, 96.2278, 94.3213])
         image_std = np.array([79.2382, 80.5267, 82.1483])
         image_height = 352
         image_width = 1216
 
         # Get LiDAR data from rosbag
-        pcd_array, stamps = load_pcd_from_rosbag(global_path + "robot/" + pcd_bag_name)
+        pcd_array, stamps = load_pcd_from_rosbag(global_path + "robot/" + pcd_bag_name, topic_lidar)
 
         # Get image data from rosbag
-        images_array, pcd_ids = load_image_from_rosbag(global_path + "camera/" + image_bag_name, stamps)
+        images_array, pcd_ids = load_image_from_rosbag(global_path + "camera/" + image_bag_name, topic_camera, stamps)
 
         print(f"Loaded {len(images_array)} images and {len(pcd_array)} pcds.")
 
